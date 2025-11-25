@@ -1,6 +1,25 @@
-# Mantis
-# Note: This repository is currently undergoing refactoring, which is expected to be completed by December 4th. Please note that running the code at this time may result in errors.
-The official implementation of Mantis
+#### Note: This repository is currently undergoing refactoring, which is expected to be completed by December 4th. Please note that running the code at this time may result in errors.
+
+
+
+<h3 align="center">
+  <a href="https://github.com/zhijie-group/Mantis" style="color:#567053">Mantis: A Versatile Vision-Language-Action Model with Disentangled Visual Foresight</a>
+</h3>
+<h5 align="center"> 
+  If you find our project helpful, please give us a star ⭐ to support us 🙏🙏
+</h5>
+
+
+
+<h5 align="center">
+
+[![arXiv](https://img.shields.io/badge/Arxiv-2511.16175-AD1C18.svg?logo=arXiv)](https://arxiv.org/pdf/2511.16175) [![hf_checkpoint](https://img.shields.io/badge/🤗-Checkpoints-9C276A.svg)](https://huggingface.co/collections/Yysrc/mantis)[![License](https://img.shields.io/badge/License-Apache%202.0-yellow)](./LICENSE) 
+
+</h5>
+
+
+
+
 
 
 #### Create environment
