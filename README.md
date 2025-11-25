@@ -10,9 +10,11 @@
   If you find our project helpful, please give us a star ⭐ to support us 🙏🙏
 </h4>
 
-<h5 align="center">
-  [**📄 Paper**](https://arxiv.org/pdf/2511.16175) | [**🤗 Checkpoints**](https://huggingface.co/collections/Yysrc/mantis) | [**🤗 Checkpoints**](./LICENSE)
-</h5>
+<p align="center">
+  <a href="https://arxiv.org/pdf/2511.16175"><b>📄 Paper</b></a> |
+  <a href="https://huggingface.co/collections/Yysrc/mantis"><b>🤗 Checkpoints</b></a> |
+  <a href="./License"><b>📜 License</b></a>
+</p>
 
 
 
