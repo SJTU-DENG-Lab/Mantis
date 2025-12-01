@@ -19,8 +19,7 @@
 
 ![head](assets/head.png)
 
-- **Disentangled Visual Foresight** automatically capture the *latent actions* that delineate the visual trajec-
-tory without overburdening the backbone.
+- **Disentangled Visual Foresight** automatically capture the *latent actions* that delineate the visual trajectory without overburdening the backbone.
 - **Progressive Training** introduces modalities in stages, preserving the language understanding and reasoning capabilities of the VLM backbone.
 - **Adaptive Temporal Ensemble** dynamically adjusts temporal ensembling strength, reducing inference cost while maintaining stable control.
 
