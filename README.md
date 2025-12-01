@@ -1,4 +1,8 @@
 
+<p align="center">
+    <img src="assets/mantis.png?raw=true" width="120" style="margin-bottom: 0.1;"/>
+<p>
+
 <h3 align="center">
   <a href="https://github.com/zhijie-group/Mantis" style="color:#567053">Mantis: A Versatile Vision-Language-Action Model<br>with Disentangled Visual Foresight</a>
 </h3>
@@ -15,8 +19,9 @@
 
 ![head](assets/head.png)
 
-- **Disentangled Visual Foresight** provides compact, action-relevant look-ahead cues without overburdening the backbone.
-- **Progressive Multimodal Training** preserves the language understanding and reasoning capabilities of the VLM backbone.
+- **Disentangled Visual Foresight** automatically capture the *latent actions* that delineate the visual trajec-
+tory without overburdening the backbone.
+- **Progressive Training** introduces modalities in stages, preserving the language understanding and reasoning capabilities of the VLM backbone.
 - **Adaptive Temporal Ensemble** dynamically adjusts temporal ensembling strength, reducing inference cost while maintaining stable control.
 
 
@@ -171,7 +176,7 @@ pip install -e .
 ```
 The configuration files are in the `configs` folder. Please update the `dataset_root_dir` to the LIBERO dataset directory and set `resume_from_checkpoint` to the path of the base Mantis model.
 
-Trai the Mantis model on the LIBERO dataset:
+Train the Mantis model on the LIBERO dataset:
 ```
 sh train.sh
 ```
