@@ -1,14 +1,11 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 import torch
 import torch.nn as nn
+
 from typing import Optional, Tuple
+from torch.nn import functional as F
 
 from transformers.models.qwen2.configuration_qwen2 import Qwen2Config
+from transformers.integrations.sdpa_attention import sdpa_attention_forward
 from transformers.models.qwen2.modeling_qwen2 import (
     Qwen2PreTrainedModel,
     Qwen2Attention,
@@ -18,8 +15,6 @@ from transformers.models.qwen2.modeling_qwen2 import (
     repeat_kv,
     apply_rotary_pos_emb,
 )
-from transformers.integrations.sdpa_attention import sdpa_attention_forward
-from torch.nn import functional as F
 
 
 class MultiHeadRMSNorm(nn.Module):

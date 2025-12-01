@@ -7,8 +7,8 @@ import os
 import threading
 
 NUM_THREADS = 100
-VIDEO_ROOT = '/data/yangyi/datasets/ssv2/20bn-something-something-v2'         # Downloaded webm videos
-FRAME_ROOT = '/data/yangyi/datasets/ssv2/frames'  # Directory for extracted frames
+VIDEO_ROOT = 'datasets/ssv2/20bn-something-something-v2'         # Downloaded webm videos
+FRAME_ROOT = 'datasets/ssv2/frames'                              # Directory for extracted frames
 
 
 def split(l, n):

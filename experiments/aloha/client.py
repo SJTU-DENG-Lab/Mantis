@@ -1,24 +1,19 @@
-import dataclasses
-import enum
-import logging
-import pathlib
 import time
-from typing import Any
-
-# --- 新增依赖 ---
-import msgpack
-import numpy as np
-import requests
-import polars as pl
+import enum
 import rich
 import tqdm
 import tyro
+import msgpack
+import logging
+import pathlib
+import requests
+import dataclasses
+
+import polars as pl
+import numpy as np
+
 
 logger = logging.getLogger(__name__)
-
-# --- 新增: MessagePack与Numpy的序列化/反序列化逻辑 ---
-# 与服务器端完全相同
-
 
 def pack_array(obj):
     if (isinstance(obj, (np.ndarray, np.generic))) and obj.dtype.kind in ("V", "O", "c"):
@@ -45,8 +40,6 @@ def packb(data): return msgpack.packb(
 def unpackb(data): return msgpack.unpackb(
     data, object_hook=unpack_array, raw=False)
 
-
-# --- Args 和 TimingRecorder 等辅助类保持不变 ---
 class EnvMode(enum.Enum):
     ALOHA = "aloha"
     ALOHA_SIM = "aloha_sim"
@@ -100,11 +93,7 @@ class TimingRecorder:
         path.parent.mkdir(parents=True, exist_ok=True)
         frame.write_parquet(path)
 
-
-# --- 【核心修改】新的 MessagePack HTTP 客户端类 ---
 class MsgPackHttpClientPolicy:
-    """一个通过HTTP与FastAPI服务器通信的客户端，使用MessagePack进行序列化。"""
-
     def __init__(self, host: str, port: int, use_https: bool = False):
         protocol = "https" if use_https else "http"
         if host.startswith("http"):
@@ -114,14 +103,12 @@ class MsgPackHttpClientPolicy:
 
         self.infer_url = f"{self.base_url}/infer"
         self.session = requests.Session()
-        # 【关键】设置请求头，告知服务器我们发送的是MessagePack数据
         self.session.headers.update({"Content-Type": "application/msgpack"})
         logger.info(
             f"MsgPack client configured to connect to: {self.base_url}")
 
     def get_server_metadata(self) -> dict:
         try:
-            # 根路径仍然返回JSON，方便调试
             response = self.session.get(self.base_url, timeout=5)
             response.raise_for_status()
             return response.json()
@@ -130,15 +117,12 @@ class MsgPackHttpClientPolicy:
             return {"error": str(e)}
 
     def infer(self, observation: dict) -> dict:
-        # 【关键】直接使用msgpack打包包含Numpy数组的字典
         packed_observation = packb(observation)
         try:
-            # 【关键】使用 data=... 发送原始二进制数据，而不是 json=...
             response = self.session.post(
                 self.infer_url, data=packed_observation, timeout=80)
             response.raise_for_status()
 
-            # 【关键】使用msgpack解包服务器返回的二进制响应
             unpacked_response = unpackb(response.content)
             return unpacked_response
         except requests.exceptions.RequestException as e:
@@ -154,11 +138,9 @@ def main(args: Args) -> None:
         EnvMode.LIBERO: _random_observation_libero,
     }[args.env]
 
-    # 使用新的MsgPack客户端
     policy = MsgPackHttpClientPolicy(
         host=args.host, port=args.port, use_https=args.use_https)
 
-    # ... (主循环和计时逻辑与之前完全相同)
     logger.info("Checking server connection...")
     metadata = policy.get_server_metadata()
     # if "error" in metadata:
@@ -187,7 +169,6 @@ def main(args: Args) -> None:
     if args.timing_file is not None:
         timing_recorder.write_parquet(args.timing_file)
 
-# --- 随机观测数据生成函数 (完全不变) ---
 
 
 def _random_observation_aloha() -> dict:
@@ -225,5 +206,3 @@ def _random_observation_libero() -> dict:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     main(tyro.cli(Args))
-    
-# uv run /data/yangyi/metaquery_action_refactoring/experiments/aloha/client.py --host "" --env ALOHA

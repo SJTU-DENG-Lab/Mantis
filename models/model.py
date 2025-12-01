@@ -1,26 +1,22 @@
-import math
-from typing import List
-
-import torch
-from torch import nn
-
+import re
 import gc
+import math
+import torch
 
+from torch import nn
+from typing import List
+from qwen_vl_utils import process_vision_info
+
+from diffusers.models.normalization import RMSNorm
+from diffusers import SanaTransformer2DModel
 from transformers import PretrainedConfig, PreTrainedModel, AutoProcessor
 from transformers import (
     Qwen2_5_VLForConditionalGeneration,
     Qwen2Config,
 )
 
-from diffusers.models.normalization import RMSNorm
-from diffusers import SanaTransformer2DModel
-
 from models.transformer_encoder import Qwen2Encoder
 from .action_model.action_model import ActionModel
-
-import re
-from qwen_vl_utils import process_vision_info
-from PIL import Image
 
 
 class MLLMInContextConfig(PretrainedConfig):
@@ -30,7 +26,7 @@ class MLLMInContextConfig(PretrainedConfig):
         diffusion_model_id: str = "Efficient-Large-Model/Sana_600M_512px_diffusers",
         in_channels: int = 32,
         input_size: int = 32,
-        num_metaqueries: int = 256,
+        num_metaqueries: int = 9,
         _gradient_checkpointing: bool = True,
         max_input_text_tokens: int = 256,
         connector_num_hidden_layers: int = 12,
@@ -56,6 +52,7 @@ class MLLMInContextConfig(PretrainedConfig):
         self.past_action_window_size = kwargs.get("past_action_window_size")
         self.num_actqueries = kwargs.get("num_actqueries")
         self.training_mode = kwargs.get("training_mode")
+
 
 class MLLMInContext(PreTrainedModel):
     def __init__(
@@ -84,48 +81,8 @@ class MLLMInContext(PreTrainedModel):
             self.mllm_backbone.resize_token_embeddings(new_vocab_size)
         except:
             self.mllm_backbone.resize_token_embeddings(new_vocab_size, mean_resizing=False)
-        
-        def freeze_hook_image(grad):
-            grad[: self.num_embeddings].zero_()
-            grad[-(config.num_actqueries + 2) :].zero_()  
-            # grad[-(config.num_gapqueries * config.max_timestep_gap + 2 + config.num_actqueries + 2) :].zero_()            
-            return grad
-
-        def freeze_hook_action(grad):
-            grad[: self.num_embeddings + config.num_metaqueries + 2
-                 + config.num_gapqueries * config.max_timestep_gap + 2].zero_()         
-            return grad
-        
-        def freeze_hook_image_action(grad):
-            grad[: self.num_embeddings].zero_()
-            grad[
-                self.num_embeddings + config.num_metaqueries + 2 : 
-                self.num_embeddings + config.num_metaqueries + 2 + config.num_gapqueries * config.max_timestep_gap + 2
-            ].zero_()      
-            return grad
-        
-        def freeze_hook_image_action_language(grad):
-            grad[
-                self.num_embeddings + config.num_metaqueries + 2 : 
-                self.num_embeddings + config.num_metaqueries + 2 + config.num_gapqueries * config.max_timestep_gap + 2
-            ].zero_()
-            return grad
-        
-        if config.training_mode == "image":
-            self.mllm_backbone.model.embed_tokens.weight.register_hook(freeze_hook_image)
-        elif config.training_mode == "action":
-            self.mllm_backbone.model.embed_tokens.weight.register_hook(freeze_hook_action)
-        elif config.training_mode == "image_action":
-            self.mllm_backbone.model.embed_tokens.weight.register_hook(freeze_hook_image_action)
-        elif config.training_mode == "image_action_language":
-            self.mllm_backbone.model.embed_tokens.weight.register_hook(freeze_hook_image_action_language)
 
         self.mllm_hidden_size = self.mllm_backbone.config.hidden_size
-        # self.mllm_backbone.lm_head = nn.Identity()
-
-        # self.tokenizer = AutoProcessor.from_pretrained(
-        #     config.mllm_id, min_pixels=224 * 224, max_pixels=1280 * 28 * 28
-        # )
         self.tokenizer = AutoProcessor.from_pretrained(
             config.mllm_id, min_pixels=224 * 224, max_pixels=960 * 24 * 24
         )
@@ -188,6 +145,7 @@ class MLLMInContext(PreTrainedModel):
             config.diffusion_model_id,
             subfolder="transformer",
             torch_dtype=torch.bfloat16,
+            use_safetensors=True,         
         )
         input_scale = math.sqrt(5.5)
 
@@ -327,6 +285,7 @@ class MLLMInContext(PreTrainedModel):
             #     [torch.clamp(sub_img, min=0.0, max=1.0) for sub_img in imgs] if imgs else None
             #     for imgs in image
             # ]
+            ###### For Aloha ######
 
             conversations = [
                 prefix
@@ -378,9 +337,8 @@ class MLLMInContext(PreTrainedModel):
 
         if "pixel_values" in text_inputs:
             text_inputs["pixel_values"] = text_inputs["pixel_values"].unsqueeze(0)
-        
-        
-        ##################################################################
+
+
         if language_data is not None:
             conversations = []
 
@@ -485,7 +443,6 @@ class MLLMInContext(PreTrainedModel):
         
         else:
             text_inputs["language_data"] = None
-        ##################################################################
 
         return text_inputs.values()
 

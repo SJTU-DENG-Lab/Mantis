@@ -2,11 +2,9 @@ import tensorflow_datasets as tfds
 import tensorflow as tf
 import json
 
-
 dataset = tfds.load(
     "droid", 
-    # data_dir="/data/yangyi/datasets/droid_100", 
-    data_dir="/data/yangyi/datasets/DROID", 
+    data_dir="/datasets/DROID", 
     split="train",
     download=False
 )
@@ -29,5 +27,5 @@ result = {
     "success_indices": success_indices
 }
 
-with open("/data/yangyi/datasets/droid_lerobot/meta/episodes_success.json", "w", encoding="utf-8") as f:
+with open("/datasets/droid_lerobot/meta/episodes_success.json", "w", encoding="utf-8") as f:
     json.dump(result, f, indent=2, ensure_ascii=False)

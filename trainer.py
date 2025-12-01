@@ -1,9 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import os
@@ -20,7 +14,6 @@ from transformers.trainer import (
     time,
     speed_metrics,
     math,
-    TRAINER_STATE_NAME,
 )
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR, SaveStrategy
 from transformers.utils import is_torch_xla_available
@@ -46,7 +39,7 @@ else:
     IS_XLA_FSDPV2_POST_2_2 = False
 
 
-class MetaQueryTrainer(Trainer):
+class MantisTrainer(Trainer):
     def evaluate(
         self,
         eval_dataset: Optional[Union[Dataset, Dict[str, Dataset]]] = None,
@@ -114,7 +107,7 @@ class MetaQueryTrainer(Trainer):
         return output.metrics
 
     @staticmethod
-    def metaquery_eval_data_collator(features):
+    def mantis_eval_data_collator(features):
         batch = {}
         for k in features[0].keys():
             batch[k] = [f[k] for f in features]
@@ -133,7 +126,7 @@ class MetaQueryTrainer(Trainer):
         ):
             return self.accelerator.prepare(self._eval_dataloader)
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
-        data_collator = self.metaquery_eval_data_collator
+        data_collator = self.mantis_eval_data_collator
 
         if is_datasets_available() and isinstance(eval_dataset, datasets.Dataset):
             eval_dataset = self._remove_unused_columns(
@@ -181,14 +174,6 @@ class MetaQueryTrainer(Trainer):
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]:
         inputs = self._prepare_inputs(inputs)
-        
-        # inputs['input_images'] = [
-        #     [
-        #         img.to(torch.float32) if isinstance(img, torch.Tensor) else img
-        #         for img in img_list
-        #     ]
-        #     for img_list in inputs['input_images']
-        # ]
 
         inputs['input_images'] = [
             [
@@ -214,91 +199,6 @@ class MetaQueryTrainer(Trainer):
         self.log_images({"images": [wandb.Image(image) for image in samples]})
         del samples
         gc.collect()
-        
-        ############################## Language Test ##############################
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "image": "/data/yangyi/datasets/language_finetune/images/coco/000000.jpg"
-                    },
-                    {
-                        "type": "text", 
-                        "text": "Analyze the image in a comprehensive and detailed manner."
-                    },
-                ],
-            },
-        ]
-        prompts = model.model.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-        image_inputs, video_inputs = process_vision_info(messages)
-        inputs = model.model.tokenizer(
-            text=prompts,
-            padding=True,
-            return_tensors="pt",
-            images=image_inputs,
-            videos=video_inputs,
-        ).to("cuda")
-
-        generated_ids = model.model.mllm_backbone.generate(**inputs, max_new_tokens=1024)
-        generated_ids_trimmed = [
-            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-        output_text1 = model.model.tokenizer.batch_decode(
-            generated_ids_trimmed, skip_special_tokens=False, clean_up_tokenization_spaces=False
-        )
-        
-        
-        
-        
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "image": "/image.png"
-                    },
-                    {
-                        "type": "text", 
-                        "text": "Discribe the image."
-                    },
-                ],
-            },
-        ]
-        prompts = model.model.tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-
-        image_inputs, video_inputs = process_vision_info(messages)
-        inputs = model.model.tokenizer(
-            text=prompts,
-            padding=True,
-            return_tensors="pt",
-            images=image_inputs,
-            videos=video_inputs,
-        ).to("cuda")
-
-        generated_ids = model.model.mllm_backbone.generate(**inputs, max_new_tokens=1024)
-        generated_ids_trimmed = [
-            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-        output_text2 = model.model.tokenizer.batch_decode(
-            generated_ids_trimmed, skip_special_tokens=False, clean_up_tokenization_spaces=False
-        )
-
-        print("@" * 50)
-        print("First Output:")
-        print(output_text1)
-        # Amidst a backdrop of urban structures, a large boat occupies the central portion of the waterway, with three individuals on board. One of them wears a distinct hat, and they are accompanied by a dog. Nearby, another smaller boat is docked further away. Dominating the scene are multiple signboards, positioned higher up, likely bearing directions or names. To power the boat, a motor is evident at the back. The presence of another hat indicates that at least two individuals on the main boat have chosen to protect themselves from the elements.
-        print(output_text2)
-        print("@" * 50)
-
-        gc.collect()
-        ############################## Language Test ##############################
 
         return (None, None, None)
 
@@ -425,7 +325,7 @@ class MetaQueryTrainer(Trainer):
             )
 
 
-class MetaQueryCallback(TrainerCallback):
+class MantisCallback(TrainerCallback):
     @staticmethod
     def print_params(model, modules_to_stat):
         for module in modules_to_stat:
@@ -463,34 +363,6 @@ class SaveCallback(TrainerCallback):
         if torch.distributed.get_rank() == 0:
             step = state.global_step
             epoch = f"{state.epoch:.2f}".replace(".", "_")
-
-            # if "image" in model.config.training_mode:
-            #     checkpoints_dir = os.path.join(args.base_dir, args.save_dir, "image_head", f"epoch{epoch}_step{step}")
-            #     os.makedirs(checkpoints_dir, exist_ok=True)
-            #     torch.save(
-            #         model.model.mllm_backbone.model.embed_tokens.weight.data.cpu(),
-            #         os.path.join(checkpoints_dir, f"embed_tokens_weight.pt")
-            #     )
-            #     torch.save(
-            #         model.model.transformer.state_dict(),
-            #         os.path.join(checkpoints_dir, f"image_head.pt")
-            #     )
-            #     torch.save(
-            #         model.model.connector.state_dict(),
-            #         os.path.join(checkpoints_dir, f"connector.pt")
-            #     )
-
-            # if "action" in model.config.training_mode:
-            #     checkpoints_dir = os.path.join(args.base_dir, args.save_dir, "action_head", f"epoch{epoch}_step{step}")
-            #     os.makedirs(checkpoints_dir, exist_ok=True)
-            #     torch.save(
-            #         model.model.mllm_backbone.model.embed_tokens.weight.data.cpu(),
-            #         os.path.join(checkpoints_dir, f"embed_tokens_weight.pt")
-            #     )
-            #     torch.save(
-            #         model.model.policy_head.state_dict(),
-            #         os.path.join(checkpoints_dir, f"policy_head.pt")
-            #     )
 
             checkpoints_dir = os.path.join(args.base_dir, args.save_dir, "whole_model", f"epoch{epoch}_step{step}")
             os.makedirs(checkpoints_dir, exist_ok=True)        

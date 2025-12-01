@@ -1,20 +1,19 @@
-"""Utils for evaluating policies in LIBERO simulation environments."""
-
-import math
 import os
-
+import math
+import time
 import imageio
+
 import numpy as np
-import tensorflow as tf
+from torchvision.transforms import v2
+from torchvision.transforms.functional import to_tensor
+
 from libero.libero import get_libero_path
 from libero.libero.envs import OffScreenRenderEnv
 
-from torchvision.transforms.functional import to_tensor
-from torchvision.transforms import v2
 
-import time
 DATE = time.strftime("%Y_%m_%d")
 DATE_TIME = time.strftime("%Y_%m_%d-%H_%M_%S")
+
 
 def _make_transform(size):
     return v2.Compose([v2.Resize(size), v2.CenterCrop(size)])
@@ -33,23 +32,6 @@ def get_libero_env(task, model_family, resolution=512):
 def get_libero_dummy_action(model_family: str):
     """Get dummy/no-op action, used to roll out the simulation while the robot does nothing."""
     return [0, 0, 0, 0, 0, 0, -1]
-
-
-def resize_image(img, resize_size):
-    """
-    Takes numpy array corresponding to a single image and returns resized image as numpy array.
-
-    NOTE (Moo Jin): To make input images in distribution with respect to the inputs seen at training time, we follow
-                    the same resizing scheme used in the Octo dataloader, which OpenVLA uses for training.
-    """
-    assert isinstance(resize_size, tuple)
-    # Resize to image size expected by model
-    img = tf.image.encode_jpeg(img)  # Encode as JPEG, as done in RLDS dataset builder
-    img = tf.io.decode_image(img, expand_animations=False, dtype=tf.uint8)  # Immediately decode back
-    img = tf.image.resize(img, resize_size, method="lanczos3", antialias=True)
-    img = tf.cast(tf.clip_by_value(tf.round(img), 0, 255), tf.uint8)
-    img = img.numpy()
-    return img
 
 
 def get_libero_image(obs, resize_size):
@@ -74,7 +56,7 @@ def get_libero_image(obs, resize_size):
 
 def save_rollout_video(rollout_images, idx, success, task_description, log_file=None):
     """Saves an MP4 replay of an episode."""
-    rollout_dir = f"./rollouts/{DATE}"
+    rollout_dir = f"./experiments/rollouts/{DATE}"
     os.makedirs(rollout_dir, exist_ok=True)
     processed_task_description = task_description.lower().replace(" ", "_").replace("\n", "_").replace(".", "_")[:50]
     mp4_path = f"{rollout_dir}/{DATE_TIME}--episode={idx}--success={success}--task={processed_task_description}.mp4"

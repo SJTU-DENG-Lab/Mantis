@@ -1,22 +1,13 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
-from datasets import Image
-import PIL
-import io
-import torch
-from torchvision.transforms import v2
-from functools import partial
-
-import numpy as np
-import json
 import os
+import io
+import PIL
+import json
+import torch
 import random
-from datasets import Features, Image, Value
-from datasets import Dataset
+
+from functools import partial
+from torchvision.transforms import v2
+from datasets import Dataset, Features, Image, Value
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata, MultiLeRobotDataset
 
 
@@ -65,7 +56,6 @@ class LeRobotTrainDataset(torch.utils.data.Dataset):
             'gap': gap
         }
 
-        # target_images = item[self.primary_image_key][gap]
         target_images = item[self.primary_image_key][gap] if len(item[self.primary_image_key]) > 2 else item[self.primary_image_key][1]
         result["target"] = (
             self.target_transform(target_images) if target_images is not None else None
@@ -91,7 +81,6 @@ class LeRobotTrainDataset(torch.utils.data.Dataset):
         ]
         
         if self.language_dataset is not None:
-            # result["language_data"] = self.language_dataset[idx % len(self.language_dataset)]
             random_idx = random.randint(0, len(self.language_dataset) - 1)
             result["language_data"] = self.language_dataset[random_idx]
 
@@ -132,7 +121,6 @@ class LeRobotEvalDataset(torch.utils.data.Dataset):
             'gap': gap
         }
 
-        # result["target"] = item[self.primary_image_key][gap]
         result["target"] = item[self.primary_image_key][gap] if len(item[self.primary_image_key]) > 2 else item[self.primary_image_key][1]
 
         input_imgs = [
@@ -450,8 +438,7 @@ def load_language_dataset(data_args, training_args):
         json_name = os.path.splitext(json_file)[0]
         
         # if json_name not in "allava":
-        if json_name not in "gpt4o":
-            continue
+        #     continue
     
         json_path = os.path.join(json_dir, json_file)
         

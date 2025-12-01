@@ -1,29 +1,8 @@
-# torchrun --nproc-per-node=8 train.py \
-#     --run_name metaquery_action_droid_gap4_6actquery_3gapquery \
-#     --config_file /data/yangyi/metaquery_action_refactoring/configs/action_training_droid.yaml \
-#     --base_dir /data/yangyi/metaquery_action_refactoring \
-#     --logging_dir /data/yangyi/metaquery_action_refactoring/log \
-#     > /data/yangyi/metaquery_action_refactoring/log/metaquery_action.log 2>&1
-
-# torchrun --nproc-per-node=8 train.py \
-#     --run_name metaquery_action_droid_gap4_6actquery_3gapquery \
-#     --config_file /data/yangyi/metaquery_action_refactoring/configs/image_action_training_libero.yaml \
-#     --base_dir /data/yangyi/metaquery_action_refactoring \
-#     --logging_dir /data/yangyi/metaquery_action_refactoring/log \
-#     > /data/yangyi/metaquery_action_refactoring/log/metaquery_spatial_image_action.log 2>&1
-
-
-# torchrun --nproc-per-node=8 train.py \
-#     --run_name metaquery_image_action_language \
-#     --config_file /data/yangyi/metaquery_action_refactoring/configs/image_action_language_training_droid_ddp.yaml \
-#     --base_dir /data/yangyi/metaquery_action_refactoring \
-#     --logging_dir /data/yangyi/metaquery_action_refactoring/log \
-#     > /data/yangyi/metaquery_action_refactoring/log/metaquery_image_action_language_without_language.log 2>&1
-
+# Available config_file options: libero_spatial_image_action.yaml, libero_object_image_action.yaml, libero_goal_image_action.yaml, libero_long_image_action.yaml
 
 torchrun --nproc-per-node=8 train.py \
-    --run_name metaquery_image_action_language_aloha_numbers \
-    --config_file /data/yangyi/metaquery_action_refactoring/configs/image_action_language_training_aloha_numbers.yaml \
-    --base_dir /data/yangyi/metaquery_action_refactoring \
-    --logging_dir /data/yangyi/metaquery_action_refactoring/log \
-    > /data/yangyi/metaquery_action_refactoring/log/image_action_language_aloha_numbers.log 2>&1
+    --run_name mantis_libero_spatial_image_action \
+    --config_file libero_spatial_image_action.yaml \
+    --base_dir ./ \
+    --logging_dir log \
+    > log/mantis_libero_spatial_image_action.log 2>&1

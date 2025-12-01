@@ -1,29 +1,18 @@
 import os
 import sys
 sys.path.append(os.getcwd())
-from models.metaquery import MetaQuery
-import json
-# from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+from models.mantis import Mantis
 from qwen_vl_utils import process_vision_info
 
 
-model_path = "/data/yangyi/hf_models_upload/droid_image_action_language/whole_models/epoch2_30"
-metaquery = MetaQuery.from_pretrained(
+model_path = "your_model_path"
+mantis = Mantis.from_pretrained(
     model_path,
 )
 
-model = metaquery.model.mllm_backbone
+model = mantis.model.mllm_backbone
 model = model.to("cuda")
-processor = metaquery.model.tokenizer
-
-
-# model_path = "/data/yangyi/.cache/models/Qwen2.5-VL-3B-Instruct"
-# model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-#     model_path,
-# )
-# model = model.to("cuda")
-# processor = AutoProcessor.from_pretrained(model_path)
-
+processor = mantis.model.tokenizer
 
 messages = [
     {
@@ -31,11 +20,11 @@ messages = [
         "content": [
             {
                 "type": "image", 
-                "image": os.path.join("/data/yangyi/datasets/language_eval/realworldqa_json", item['image'])
+                "image": "test.png"
             },
             {
                 "type": "text", 
-                "text": item['question']
+                "text": "Describe this picture."
             },
         ],
     },
@@ -61,4 +50,5 @@ generated_ids_trimmed = [
 output_text = processor.batch_decode(
     generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
 )
-print(item['id'], output_text)
+
+print(output_text)

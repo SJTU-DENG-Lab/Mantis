@@ -1,27 +1,25 @@
 
 import os
+import sys
 import math
-from dataclasses import dataclass
-from typing import Optional
-from skimage.util import view_as_blocks
-from PIL import Image
-
-from metaquery_vla_utils import MetaQueryVLA
-
-import draccus
-import numpy as np
 import tqdm
-from libero.libero import benchmark
-
-import wandb
-
+import time
 import torch
 import random
-import time
+import wandb
+import draccus
 import torchvision
 
-# Append current directory so that interpreter can find experiments.robot
-# sys.path.append("../..")
+import numpy as np
+from typing import Optional
+from dataclasses import dataclass
+from skimage.util import view_as_blocks
+from mantis_vla_utils import MantisVLA
+
+sys.path.append(os.path.join(os.getcwd(), "LIBERO"))
+from libero.libero import benchmark
+
+
 from libero_utils import (
     get_libero_dummy_action,
     get_libero_env,
@@ -33,41 +31,28 @@ from libero_utils import (
 
 @dataclass
 class GenerateConfig:
-    # fmt: off
-
-    #################################################################################################################
-    # Model-specific parameters
-    #################################################################################################################
-    model_family: str = "metaquery_vla"
-    center_crop: bool = True                         # Center crop? (if trained w/ random crop image aug)
-    long: bool=False 
-    #################################################################################################################
-    # LIBERO environment-specific parameters
-    #################################################################################################################
+    model_family: str = "mantis"
     task_suite_name: str = "libero_spatial"          # Task suite. Options: libero_spatial, libero_object, libero_goal, libero_10, libero_90
     num_steps_wait: int = 10                         # Number of steps to wait for objects to stabilize in sim
     num_trials_per_task: int = 50                    # Number of rollouts per task
 
-    #################################################################################################################
-    # Utils
-    #################################################################################################################
     run_id_note: Optional[str] = None                # Extra note to add in run ID for logging
-    local_log_dir: str = "/data/yangyi/metaquery_action_refactoring/experiments/libero_eval_logs"        
+    local_log_dir: str = "experiments/libero_eval_logs"  
+    norm_file_path: str = "configs/norm_stats.json"
 
     use_wandb: bool = False                          # Whether to also log results in Weights & Biases
     wandb_project: str = "YOUR_WANDB_PROJECT"        # Name of W&B project to log to (use default!)
     wandb_entity: str = "YOUR_WANDB_ENTITY"          # Name of entity to log under
 
     seed: int = 7                                    # Random Seed (for reproducibility)
-    
     model_id: str = None
     checkpoints_dir: str = None
     action_dim: int = 7
     future_action_window_size: int = 4
 
-    eval_mode: str = "action_chunking"
-    dynamic_tokens_threshold: float = 0.1
-    relevant_tokens_threshold: float = 0.1
+    eval_mode: str = "temporal_ensemble"
+    dynamic_patches_threshold: float = 0.12
+    target_patches_threshold: float = 0.01
 
 
 def set_seed_everywhere(seed: int):
@@ -79,26 +64,6 @@ def set_seed_everywhere(seed: int):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     os.environ["PYTHONHASHSEED"] = str(seed)
-
-
-def normalize_gripper_action(action, binarize=True):
-    # Just normalize the last action to [-1,+1].
-    orig_low, orig_high = 0.0, 1.0
-    action[..., -1] = 2 * (action[..., -1] - orig_low) / (orig_high - orig_low) - 1
-    if binarize:
-        # Binarize to -1 or +1.
-        action[..., -1] = np.sign(action[..., -1])
-    return action
-
-
-def invert_gripper_action(action):
-    """
-    Flips the sign of the gripper action (last dimension of action vector).
-    This is necessary for some environments where -1 = open, +1 = close, since
-    the RLDS dataloader aligns gripper actions such that 0 = close, 1 = open.
-    """
-    action[..., -1] = action[..., -1] * -1.0
-    return action
 
 
 def calculate_patch_similarity(patches1, patches2):
@@ -156,9 +121,10 @@ def eval_libero(cfg: GenerateConfig) -> None:
     cfg.unnorm_key = cfg.task_suite_name
 
     # Load model
-    metaquery_vla = MetaQueryVLA(
+    mantis_vla = MantisVLA(
         cfg.model_id,
-        cfg.checkpoints_dir
+        cfg.checkpoints_dir,
+        cfg.norm_file_path
     )
 
     # Initialize local logging
@@ -191,7 +157,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
     # Start evaluation
     total_episodes, total_successes, total_inference_count = 0, 0, 0
-    total_start_time = time.perf_counter()
     for task_id in tqdm.tqdm(range(num_tasks_in_suite)):
         # Get task
         task = task_suite.get_task(task_id)
@@ -204,7 +169,6 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
         # Start episodes
         task_episodes, task_successes, task_inference_count = 0, 0, 0
-        task_start_time = time.perf_counter()
         for episode_idx in tqdm.tqdm(range(cfg.num_trials_per_task)):
             print(f"\nTask: {task_description}")
             log_file.write(f"\nTask: {task_description}\n")
@@ -232,9 +196,9 @@ def eval_libero(cfg: GenerateConfig) -> None:
             print(f"Starting episode {task_episodes+1}...")
             log_file.write(f"Starting episode {task_episodes+1}...\n")
 
-            if cfg.eval_mode in ["action_chunking", "action_chunking_dynamic_temporal_agg"]:
+            if cfg.eval_mode in ["action_chunking", "adaptive_temporal_ensemble"]:
                 query_frequency = cfg.future_action_window_size
-            elif cfg.eval_mode in ["action_chunking_temporal_agg"]:
+            elif cfg.eval_mode in ["temporal_ensemble"]:
                 query_frequency = 1
             all_time_actions = np.zeros(
                 (max_steps + cfg.num_steps_wait, max_steps + cfg.num_steps_wait + cfg.future_action_window_size, cfg.action_dim),
@@ -250,7 +214,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
                     continue
 
                 img, save_img = get_libero_image(obs, resize_size)    
-                # replay_images.append(save_img[0])
+                replay_images.append(save_img[0])
                 observation = {
                     "full_image": img,
                     "state": np.concatenate(
@@ -259,28 +223,24 @@ def eval_libero(cfg: GenerateConfig) -> None:
                 }
 
                 if (t - cfg.num_steps_wait) % query_frequency == 0:
-                    actions, top_relation_indices, num_patches = metaquery_vla.inference(
+                    actions, top_relation_indices, num_patches = mantis_vla.inference(
                         observation["full_image"], 
                         task_description, 
                         unnorm_key=cfg.unnorm_key,
                         eval_mode=cfg.eval_mode,
-                        relevant_tokens_threshold=cfg.relevant_tokens_threshold,
+                        target_patches_threshold=cfg.target_patches_threshold,
                     )
                     all_time_actions[t, t:t + cfg.future_action_window_size] = actions
                     task_inference_count += 1
                     total_inference_count += 1
 
-                if cfg.eval_mode in ["action_chunking_dynamic_temporal_agg"] and previous_img is not None:
-                    grid_size = int(math.sqrt(num_patches))
-                    # target_size = ((img[0].shape[0] + grid_size - 1) // grid_size) * grid_size
-                    # img_0 = Image.fromarray(previous_img).resize((target_size, target_size))
-                    # img_1 = Image.fromarray(img[0]).resize((target_size, target_size))
-                    
+                if cfg.eval_mode in ["adaptive_temporal_ensemble"] and previous_img is not None:
+                    grid_size = int(math.sqrt(num_patches)) 
                     target_size = ((img[0].shape[1] + grid_size - 1) // grid_size) * grid_size
                     img_0 = torchvision.transforms.functional.to_pil_image(previous_img).resize((target_size, target_size))
                     img_1 = torchvision.transforms.functional.to_pil_image(img[0]).resize((target_size, target_size))
                     
-                    top_different_ids = find_most_different_patches(img_0, img_1, target_size, grid_size, top_percentage=cfg.dynamic_tokens_threshold)
+                    top_different_ids = find_most_different_patches(img_0, img_1, target_size, grid_size, top_percentage=cfg.dynamic_patches_threshold)
                     query_frequency = 1 if set(top_different_ids) & set(top_relation_indices) else cfg.future_action_window_size      
 
                 actions_for_curr_step = all_time_actions[:, t]
@@ -308,9 +268,9 @@ def eval_libero(cfg: GenerateConfig) -> None:
 
 
             # Save a replay video of the episode
-            # save_rollout_video(
-            #     replay_images, total_episodes, success=done, task_description=task_description, log_file=log_file
-            # )
+            save_rollout_video(
+                replay_images, total_episodes, success=done, task_description=task_description, log_file=log_file
+            )
 
             # Log current results
             print(f"Success: {done}")
@@ -321,25 +281,16 @@ def eval_libero(cfg: GenerateConfig) -> None:
             log_file.write(f"# successes: {total_successes} ({total_successes / total_episodes * 100:.1f}%)\n")
             log_file.flush()
 
-
-        task_end_time = time.perf_counter()
-        total_end_time = time.perf_counter()
-        task_inference_time = task_end_time - task_start_time
-        total_inference_time = total_end_time - total_start_time
-
         print(f"Current task success rate: {float(task_successes) / float(task_episodes)}")
         print(f"Current total success rate: {float(total_successes) / float(total_episodes)}")
         print(f"Current task inference count: {float(task_inference_count) / float(task_episodes)}")
         print(f"Current total inference count: {float(total_inference_count) / float(total_episodes)}")
-        print(f"Current task inference time: {float(task_inference_time) / float(task_episodes)}")
-        print(f"Current total inference time: {float(total_inference_time) / float(total_episodes)}")
         log_file.write(f"Current task success rate: {float(task_successes) / float(task_episodes)}\n")
         log_file.write(f"Current total success rate: {float(total_successes) / float(total_episodes)}\n")
         log_file.write(f"Current task inference count: {float(task_inference_count) / float(task_episodes)}\n")
         log_file.write(f"Current total inference count: {float(total_inference_count) / float(total_episodes)}\n")
-        log_file.write(f"Current task inference time: {float(task_inference_time) / float(task_episodes)}\n")
-        log_file.write(f"Current total inference time: {float(total_inference_time) / float(total_episodes)}\n")
         log_file.flush()
+
         if cfg.use_wandb:
             wandb.log(
                 {

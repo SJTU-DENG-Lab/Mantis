@@ -4,3 +4,4 @@ bddl
 easydict
 cloudpickle
 gym
+numpy==1.26.4

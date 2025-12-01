@@ -1,15 +1,9 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-
 import os
 import yaml
-from transformers.trainer_utils import get_last_checkpoint
+import torch
 import random
 import numpy as np
-import torch
+from transformers.trainer_utils import get_last_checkpoint
 
 
 class ProcessorWrapper:
