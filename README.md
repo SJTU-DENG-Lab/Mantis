@@ -136,7 +136,7 @@ First, clone the repository and create the conda environment:
 ```
 git clone git@github.com:Yysrc/Mantis.git
 cd Mantis
-conda env create -f environment_libero.yml
+conda env create -f configs/environment_libero.yml
 conda activate mantis_libero
 ```
 Then clone and install the [LIBERO repository](https://github.com/Lifelong-Robot-Learning/LIBERO):
@@ -162,7 +162,7 @@ Modify the `task_suite_name` parameter in the script to evaluate different task 
 
 First, create the training conda environment:
 ```
-conda env create -f environment_lerobot.yml
+conda env create -f configs/environment_lerobot.yml
 conda activate mantis_lerobot
 ```
 
