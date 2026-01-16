@@ -4,7 +4,7 @@
 <p>
 
 <h3 align="center">
-  <a href="https://github.com/zhijie-group/Mantis" style="color:#567053">Mantis: A Versatile Vision-Language-Action Model<br>with Disentangled Visual Foresight</a>
+  <a href="https://github.com/SJTU-DENG-Lab/Mantis" style="color:#567053">Mantis: A Versatile Vision-Language-Action Model<br>with Disentangled Visual Foresight</a>
 </h3>
 
 <h4 align="center"> 
